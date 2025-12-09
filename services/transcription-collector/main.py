@@ -1,5 +1,6 @@
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, HTTPException, Depends, Header
+from fastapi.middleware.cors import CORSMiddleware
 import logging
 import asyncio
 from datetime import datetime, timezone
@@ -34,6 +35,16 @@ app = FastAPI(
     title="Transcription Collector",
     description="Collects and stores transcriptions from WhisperLive instances via Redis Streams."
 )
+
+# Add CORS middleware to allow all origins
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all methods
+    allow_headers=["*"],  # Allow all headers
+)
+
 app.include_router(api_router)
 
 # Configure logging

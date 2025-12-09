@@ -3,6 +3,7 @@ import secrets
 import string
 import os
 from fastapi import FastAPI, APIRouter, Depends, HTTPException, status, Security, Response
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -31,6 +32,15 @@ logger = logging.getLogger("admin_api")
 
 # App initialization
 app = FastAPI(title="Vexa Admin API")
+
+# Add CORS middleware to allow all origins
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all methods
+    allow_headers=["*"],  # Allow all headers
+)
 
 # --- Pydantic Schemas for new endpoint ---
 class WebhookUpdate(BaseModel):

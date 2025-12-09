@@ -88,6 +88,15 @@ app = FastAPI(
     # Note: Applying them globally or per-route is done below
 )
 
+# Add CORS middleware to allow all origins
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all methods
+    allow_headers=["*"],  # Allow all headers
+)
+
 # Custom OpenAPI Schema
 def custom_openapi():
     if app.openapi_schema:

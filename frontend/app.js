@@ -49,6 +49,9 @@ function formatDuration(seconds) {
 
 // API Functions
 async function apiRequest(url, options = {}) {
+    // Remove trailing slash from URL to prevent double slashes
+    url = url.replace(/\/+$/, '');
+    
     const headers = {
         'Content-Type': 'application/json',
         ...options.headers
@@ -84,7 +87,10 @@ document.getElementById('userLoginForm').addEventListener('submit', async (e) =>
     showLoading();
 
     const apiKey = document.getElementById('userApiKey').value.trim();
-    const baseUrl = document.getElementById('userBaseUrl').value.trim();
+    let baseUrl = document.getElementById('userBaseUrl').value.trim();
+    
+    // Remove trailing slash
+    baseUrl = baseUrl.replace(/\/+$/, '');
 
     try {
         // Test the API key by fetching bot status
@@ -121,7 +127,10 @@ document.getElementById('adminLoginForm').addEventListener('submit', async (e) =
     showLoading();
 
     const adminToken = document.getElementById('adminToken').value.trim();
-    const adminBaseUrl = document.getElementById('adminBaseUrl').value.trim();
+    let adminBaseUrl = document.getElementById('adminBaseUrl').value.trim();
+    
+    // Remove trailing slash
+    adminBaseUrl = adminBaseUrl.replace(/\/+$/, '');
 
     try {
         // Test the admin token by fetching users
