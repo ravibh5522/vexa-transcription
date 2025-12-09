@@ -135,7 +135,7 @@ services:
     image: hashicorp/consul:1.16
     command: agent -dev -client=0.0.0.0
     ports:
-      - "8502:8500"
+      - "${CONSUL_HOST_PORT:-18502}:8500"
     networks:
       - vexa_default
     restart: unless-stopped
@@ -152,8 +152,8 @@ services:
       - --accesslog=true
       - --accesslog.format=json
     ports:
-      - "8082:8080"
-      - "8081:8081"
+      - "${TRAEFIK_WEB_HOST_PORT:-18081}:8081"
+      - "${TRAEFIK_DASHBOARD_HOST_PORT:-18082}:8080"
     networks:
       - vexa_default
     restart: unless-stopped
