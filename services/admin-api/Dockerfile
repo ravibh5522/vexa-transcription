@@ -5,12 +5,12 @@ FROM python:3.10-slim
 WORKDIR /app
 
 # Install shared library first
-COPY ./libs/shared-models /app/libs/shared-models
+COPY libs/shared-models /app/libs/shared-models
 RUN pip install --no-cache-dir /app/libs/shared-models
 
 # Copy application code and requirements
-COPY ./services/admin-api/requirements.txt /app/
-COPY ./services/admin-api/app /app/app
+COPY services/admin-api/requirements.txt /app/
+COPY services/admin-api/app /app/app
 
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
