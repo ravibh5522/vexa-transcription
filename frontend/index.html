@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vexa - Real-time Meeting Transcription</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <h1>🎙️ Vexa</h1>
+                <p>Real-time Meeting Transcription</p>
+            </div>
+            <nav id="mainNav" class="hidden">
+                <button id="dashboardBtn" class="nav-btn active">Dashboard</button>
+                <button id="meetingsBtn" class="nav-btn">Meetings</button>
+                <button id="settingsBtn" class="nav-btn">Settings</button>
+                <button id="logoutBtn" class="nav-btn logout">Logout</button>
+            </nav>
+        </header>
+
+        <!-- Login Screen -->
+        <div id="loginScreen" class="screen active">
+            <div class="login-container">
+                <h2>Welcome to Vexa</h2>
+                <div class="login-tabs">
+                    <button class="tab-btn active" data-tab="user">User Login</button>
+                    <button class="tab-btn" data-tab="admin">Admin Login</button>
+                </div>
+
+                <!-- User Login -->
+                <form id="userLoginForm" class="login-form active">
+                    <div class="form-group">
+                        <label for="userApiKey">API Key</label>
+                        <input type="password" id="userApiKey" placeholder="Enter your API key" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="userBaseUrl">Server URL</label>
+                        <input type="text" id="userBaseUrl" placeholder="http://your-server:18056" value="http://localhost:18056">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Login as User</button>
+                </form>
+
+                <!-- Admin Login -->
+                <form id="adminLoginForm" class="login-form">
+                    <div class="form-group">
+                        <label for="adminToken">Admin Token</label>
+                        <input type="password" id="adminToken" placeholder="Enter admin token" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="adminBaseUrl">Admin API URL</label>
+                        <input type="text" id="adminBaseUrl" placeholder="http://your-server:18057" value="http://localhost:18057">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Login as Admin</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Dashboard Screen -->
+        <div id="dashboardScreen" class="screen">
+            <div class="dashboard-header">
+                <h2 id="dashboardTitle">Dashboard</h2>
+                <button id="newBotBtn" class="btn btn-primary">+ New Bot</button>
+            </div>
+
+            <!-- User Dashboard -->
+            <div id="userDashboard" class="dashboard-content">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Active Bots</h3>
+                        <p class="stat-value" id="activeBots">0</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Total Meetings</h3>
+                        <p class="stat-value" id="totalMeetings">0</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Completed</h3>
+                        <p class="stat-value" id="completedMeetings">0</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Failed</h3>
+                        <p class="stat-value" id="failedMeetings">0</p>
+                    </div>
+                </div>
+
+                <div class="active-bots-section">
+                    <h3>Active Bots</h3>
+                    <div id="activeBotsList" class="bots-list"></div>
+                </div>
+            </div>
+
+            <!-- Admin Dashboard -->
+            <div id="adminDashboard" class="dashboard-content hidden">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Total Users</h3>
+                        <p class="stat-value" id="adminTotalUsers">0</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>All Meetings</h3>
+                        <p class="stat-value" id="adminTotalMeetings">0</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Active Now</h3>
+                        <p class="stat-value" id="adminActiveMeetings">0</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>System Health</h3>
+                        <p class="stat-value status-healthy">✓</p>
+                    </div>
+                </div>
+
+                <div class="admin-actions">
+                    <button id="createUserBtn" class="btn btn-secondary">Create User</button>
+                    <button id="viewAllUsersBtn" class="btn btn-secondary">View All Users</button>
+                    <button id="viewAllMeetingsBtn" class="btn btn-secondary">View All Meetings</button>
+                </div>
+
+                <div id="adminContent" class="admin-content-area"></div>
+            </div>
+        </div>
+
+        <!-- Meetings Screen -->
+        <div id="meetingsScreen" class="screen">
+            <div class="meetings-header">
+                <h2>My Meetings</h2>
+                <div class="filters">
+                    <select id="statusFilter">
+                        <option value="all">All Status</option>
+                        <option value="active">Active</option>
+                        <option value="completed">Completed</option>
+                        <option value="failed">Failed</option>
+                    </select>
+                    <select id="platformFilter">
+                        <option value="all">All Platforms</option>
+                        <option value="google_meet">Google Meet</option>
+                        <option value="teams">Microsoft Teams</option>
+                    </select>
+                </div>
+            </div>
+            <div id="meetingsList" class="meetings-list"></div>
+        </div>
+
+        <!-- Settings Screen -->
+        <div id="settingsScreen" class="screen">
+            <h2>Settings</h2>
+            <div class="settings-content">
+                <div class="setting-section">
+                    <h3>API Configuration</h3>
+                    <div class="form-group">
+                        <label>Your API Key</label>
+                        <div class="api-key-display">
+                            <input type="password" id="displayApiKey" readonly>
+                            <button id="toggleApiKey" class="btn-icon">👁️</button>
+                            <button id="copyApiKey" class="btn-icon">📋</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Server URL</label>
+                        <input type="text" id="displayServerUrl" readonly>
+                    </div>
+                </div>
+
+                <div class="setting-section" id="webhookSection">
+                    <h3>Webhook Configuration</h3>
+                    <div class="form-group">
+                        <label for="webhookUrl">Webhook URL</label>
+                        <input type="url" id="webhookUrl" placeholder="https://your-service.com/webhook">
+                    </div>
+                    <button id="saveWebhookBtn" class="btn btn-primary">Save Webhook</button>
+                </div>
+
+                <div class="setting-section">
+                    <h3>About</h3>
+                    <p>Vexa Real-time Meeting Transcription Platform</p>
+                    <p>Version: 1.0.0</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <!-- New Bot Modal -->
+    <div id="newBotModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Request New Bot</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="newBotForm">
+                <div class="form-group">
+                    <label for="platform">Platform *</label>
+                    <select id="platform" required>
+                        <option value="">Select Platform</option>
+                        <option value="google_meet">Google Meet</option>
+                        <option value="teams">Microsoft Teams</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="meetingId">Meeting ID *</label>
+                    <input type="text" id="meetingId" placeholder="e.g., abc-defg-hij or 9387167464734" required>
+                    <small class="form-hint" id="meetingIdHint">Enter meeting code from URL</small>
+                </div>
+                <div class="form-group" id="passcodeGroup" style="display: none;">
+                    <label for="passcode">Passcode *</label>
+                    <input type="text" id="passcode" placeholder="Teams meeting passcode">
+                    <small class="form-hint">Required for Microsoft Teams</small>
+                </div>
+                <div class="form-group">
+                    <label for="language">Language (optional)</label>
+                    <select id="language">
+                        <option value="">Auto-detect</option>
+                        <option value="en">English</option>
+                        <option value="es">Spanish</option>
+                        <option value="fr">French</option>
+                        <option value="de">German</option>
+                        <option value="it">Italian</option>
+                        <option value="pt">Portuguese</option>
+                        <option value="zh">Chinese</option>
+                        <option value="ja">Japanese</option>
+                        <option value="ko">Korean</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="botName">Bot Name (optional)</label>
+                    <input type="text" id="botName" placeholder="e.g., MyMeetingBot">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('newBotModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Request Bot</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Transcript Modal -->
+    <div id="transcriptModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>Meeting Transcript</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="transcript-controls">
+                <button id="liveTranscriptBtn" class="btn btn-secondary">Live Updates</button>
+                <button id="downloadTranscriptBtn" class="btn btn-secondary">Download</button>
+            </div>
+            <div id="transcriptContent" class="transcript-content"></div>
+        </div>
+    </div>
+
+    <!-- Create User Modal (Admin) -->
+    <div id="createUserModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create User</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="createUserForm">
+                <div class="form-group">
+                    <label for="userEmail">Email *</label>
+                    <input type="email" id="userEmail" required>
+                </div>
+                <div class="form-group">
+                    <label for="userName">Name</label>
+                    <input type="text" id="userName">
+                </div>
+                <div class="form-group">
+                    <label for="userImageUrl">Image URL</label>
+                    <input type="url" id="userImageUrl">
+                </div>
+                <div class="form-group">
+                    <label for="maxConcurrentBots">Max Concurrent Bots</label>
+                    <input type="number" id="maxConcurrentBots" value="5" min="0">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('createUserModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- User Details Modal (Admin) -->
+    <div id="userDetailsModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>User Details</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div id="userDetailsContent"></div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay hidden">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
