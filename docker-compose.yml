@@ -218,9 +218,6 @@ services:
         BUILD_DATE: "${BUILD_DATE:-now}"
     ports:
       - "${TRANSCRIPTION_COLLECTOR_HOST_PORT:-8123}:8000"
-    volumes:
-      - ./alembic.ini:/app/alembic.ini
-      - ./libs/shared-models/alembic:/app/alembic
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
