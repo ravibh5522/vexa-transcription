@@ -1,0 +1,35 @@
+# Makefile for Coolify Deployment
+# This simplifies the build process for Coolify
+
+.PHONY: build-all build-bot build-services start stop
+
+# Build all images (use this in Coolify)
+build-all: build-bot build-services
+	@echo "✅ All images built successfully"
+
+# Build the bot image first (required by bot-manager)
+build-bot:
+	@echo "Building vexa-bot image..."
+	@cd services/vexa-bot && docker build -t vexa-bot:dev -f core/Dockerfile core
+
+# Build all service images
+build-services:
+	@echo "Building service images..."
+	@docker compose --profile cpu build
+
+# Start services (use this after build)
+start:
+	@docker compose --profile cpu up -d
+
+# Stop services
+stop:
+	@docker compose down
+
+# Full deployment (build + start)
+deploy: build-all start
+	@echo "✅ Deployment complete!"
+
+# Clean up
+clean:
+	@docker compose down -v
+	@docker system prune -f
