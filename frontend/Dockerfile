@@ -1,14 +1,13 @@
-FROM nginx:alpine
+FROM python:3.11-slim
 
-# Copy frontend files
-COPY frontend/ /usr/share/nginx/html/
+WORKDIR /app
 
-# Copy custom nginx config
-COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
-
-# Ensure proper permissions
-RUN chmod -R 755 /usr/share/nginx/html
+# Copy static files
+COPY index.html .
+COPY styles.css .
+COPY app.js .
+COPY server.py .
 
 EXPOSE 80
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["python", "server.py"]
