@@ -1,6 +1,16 @@
 name: vexa_dev
 services:
-  # Frontend UI - Static files served by nginx
+  # Vexa Bot - Built but not run as a service (spawned dynamically by bot-manager)
+  vexa-bot:
+    build:
+      context: services/vexa-bot/core
+      dockerfile: Dockerfile
+    image: vexa-bot:dev
+    profiles: ["build-only"]  # Won't start, just builds the image
+    networks:
+      - vexa_default
+
+  # Frontend UI - Static files served by Python http.server
   vexa-ui:
     build:
       context: .
