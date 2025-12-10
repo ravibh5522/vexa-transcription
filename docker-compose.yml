@@ -193,7 +193,6 @@ services:
 
   # CPU version of WhisperLive for users without GPU
   whisperlive-cpu:
-    profiles: ["cpu"]
     build:
       context: .
       dockerfile: services/WhisperLive/Dockerfile.cpu
