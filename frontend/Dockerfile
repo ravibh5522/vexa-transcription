@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Copy static files (paths relative to repo root in Coolify)
+# Copy static files from frontend directory
 COPY frontend/index.html .
 COPY frontend/styles.css .
 COPY frontend/app.js .
