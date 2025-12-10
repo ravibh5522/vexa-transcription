@@ -47,6 +47,21 @@ function formatDuration(seconds) {
     return `${hours}h ${minutes}m ${secs}s`;
 }
 
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('Copied to clipboard!', 'success');
+    }).catch(err => {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        showToast('Copied to clipboard!', 'success');
+    });
+}
+
 // API Functions
 async function apiRequest(url, options = {}) {
     // Remove trailing slash from URL to prevent double slashes
@@ -773,7 +788,9 @@ async function viewUserDetails(userId) {
                         <tbody>
                             ${user.api_tokens.map(t => `
                                 <tr>
-                                    <td><code>${t.token.substring(0, 20)}...</code></td>
+                                    <td><code style="word-break: break-all; font-size: 12px;">${t.token}</code>
+                                        <button class="btn-icon" onclick="copyToClipboard('${t.token}')" title="Copy">📋</button>
+                                    </td>
                                     <td>${formatDateTime(t.created_at)}</td>
                                     <td>
                                         <button class="btn btn-danger" onclick="deleteToken(${t.id})">Delete</button>
