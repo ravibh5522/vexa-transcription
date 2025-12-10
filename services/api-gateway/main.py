@@ -171,22 +171,43 @@ def custom_openapi():
 
 app.openapi = custom_openapi
 
+# --- Health Check Endpoint ---
+@app.get("/health", tags=["General"], summary="Health Check")
+async def health_check():
+    """Health check endpoint for container orchestration."""
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
 # --- HTTP Client --- 
-# Use a single client instance for connection pooling
+# Use a single client instance for connection pooling with explicit timeouts
 @app.on_event("startup")
 async def startup_event():
-    app.state.http_client = httpx.AsyncClient()
+    # Configure timeouts to prevent hanging connections
+    timeout = httpx.Timeout(30.0, connect=10.0)  # 30s total, 10s for connect
+    limits = httpx.Limits(max_keepalive_connections=20, max_connections=100)
+    app.state.http_client = httpx.AsyncClient(timeout=timeout, limits=limits)
     # Initialize Redis for Pub/Sub used by WS
     redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
-    app.state.redis = await aioredis.from_url(redis_url, encoding="utf-8", decode_responses=True)
+    try:
+        app.state.redis = await aioredis.from_url(redis_url, encoding="utf-8", decode_responses=True)
+        print(f"Connected to Redis at {redis_url}")
+    except Exception as e:
+        print(f"WARNING: Failed to connect to Redis: {e}")
+        app.state.redis = None
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    await app.state.http_client.aclose()
+    print("Shutting down API Gateway...")
     try:
-        await app.state.redis.close()
-    except Exception:
-        pass
+        await app.state.http_client.aclose()
+        print("HTTP client closed")
+    except Exception as e:
+        print(f"Error closing HTTP client: {e}")
+    try:
+        if app.state.redis:
+            await app.state.redis.close()
+            print("Redis connection closed")
+    except Exception as e:
+        print(f"Error closing Redis: {e}")
 
 # --- Helper for Forwarding --- 
 async def forward_request(client: httpx.AsyncClient, method: str, url: str, request: Request) -> Response:
@@ -235,9 +256,15 @@ async def forward_request(client: httpx.AsyncClient, method: str, url: str, requ
         print(f"DEBUG: Response from {url}: status={resp.status_code}")
         # Return downstream response directly (including headers, status code)
         return Response(content=resp.content, status_code=resp.status_code, headers=dict(resp.headers))
+    except httpx.TimeoutException as exc:
+        print(f"DEBUG: Timeout error: {exc}")
+        raise HTTPException(status_code=504, detail=f"Gateway timeout: upstream service did not respond in time")
     except httpx.RequestError as exc:
         print(f"DEBUG: Request error: {exc}")
         raise HTTPException(status_code=503, detail=f"Service unavailable: {exc}")
+    except Exception as exc:
+        print(f"DEBUG: Unexpected error in forward_request: {exc}")
+        raise HTTPException(status_code=500, detail=f"Internal gateway error: {exc}")
 
 # --- Root Endpoint --- 
 @app.get("/", tags=["General"], summary="API Gateway Root")
