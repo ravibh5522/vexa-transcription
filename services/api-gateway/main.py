@@ -3,6 +3,8 @@ from fastapi import FastAPI, Request, Response, HTTPException, status, Depends, 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.security import APIKeyHeader
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import PlainTextResponse
 import httpx
 import os
 from dotenv import load_dotenv
@@ -95,10 +97,36 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Allow all origins
     allow_credentials=False,  # Must be False when using "*" for origins
-    allow_methods=["*"],  # Allow all methods
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
     allow_headers=["*"],  # Allow all headers
     expose_headers=["*"],  # Expose all headers to the browser
+    max_age=86400,  # Cache preflight for 24 hours
 )
+
+# Custom CORS middleware as backup - adds headers even if CORSMiddleware misses
+class CORSBackupMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Handle preflight OPTIONS requests directly
+        if request.method == "OPTIONS":
+            response = PlainTextResponse("OK", status_code=200)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD"
+            response.headers["Access-Control-Allow-Headers"] = "*"
+            response.headers["Access-Control-Max-Age"] = "86400"
+            return response
+        
+        response = await call_next(request)
+        
+        # Ensure CORS headers are present on all responses
+        if "Access-Control-Allow-Origin" not in response.headers:
+            response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        
+        return response
+
+# Add backup CORS middleware (runs before the main CORS middleware)
+app.add_middleware(CORSBackupMiddleware)
 
 # Custom OpenAPI Schema
 def custom_openapi():
