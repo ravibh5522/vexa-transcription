@@ -89,12 +89,15 @@ app = FastAPI(
 )
 
 # Add CORS middleware to allow all origins
+# Note: allow_credentials=True is incompatible with allow_origins=["*"]
+# When using "*", credentials must be False
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Allow all origins
-    allow_credentials=True,
+    allow_credentials=False,  # Must be False when using "*" for origins
     allow_methods=["*"],  # Allow all methods
     allow_headers=["*"],  # Allow all headers
+    expose_headers=["*"],  # Expose all headers to the browser
 )
 
 # Custom OpenAPI Schema
@@ -139,15 +142,6 @@ def custom_openapi():
     return app.openapi_schema
 
 app.openapi = custom_openapi
-
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # --- HTTP Client --- 
 # Use a single client instance for connection pooling
