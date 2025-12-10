@@ -27,9 +27,10 @@ RUN sed -i '/openai-whisper/d' /tmp/requirements.txt || true \
     && sed -i '/onnxruntime==/d' /tmp/requirements.txt || true
 
 # Install CPU-specific packages
-RUN pip install --no-cache-dir -r /tmp/requirements.txt \
+# Use --extra-index-url (not --index-url) to keep PyPI as primary for build deps like flit_core
+RUN pip install --no-cache-dir torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cpu \
     && pip install --no-cache-dir onnxruntime \
-    && pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+    && pip install --no-cache-dir -r /tmp/requirements.txt
 
 # Install CPU-optimized faster-whisper
 RUN pip install --no-cache-dir 'faster-whisper[cpu]'
