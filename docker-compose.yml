@@ -1,12 +1,19 @@
-name: vexa_dev
+version: '3.8'
+
 services:
-  # Frontend UI - Static files served by nginx
+  # Frontend UI - Static files served by Python HTTP server
   vexa-ui:
     build:
       context: .
       dockerfile: frontend/Dockerfile
     ports:
       - "${VEXA_UI_HOST_PORT:-18080}:80"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:80/health\")' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
     networks:
       - vexa_default
     restart: unless-stopped
