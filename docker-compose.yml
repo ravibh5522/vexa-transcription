@@ -147,6 +147,12 @@ services:
     command: agent -dev -client=0.0.0.0
     ports:
       - "${CONSUL_HOST_PORT:-18502}:8500"
+    healthcheck:
+      test: ["CMD-SHELL", "consul members || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
     networks:
       - vexa_default
     restart: unless-stopped
@@ -165,6 +171,9 @@ services:
     ports:
       - "${TRAEFIK_WEB_HOST_PORT:-18081}:8081"
       - "${TRAEFIK_DASHBOARD_HOST_PORT:-18082}:8080"
+    depends_on:
+      consul:
+        condition: service_healthy
     networks:
       - vexa_default
     restart: unless-stopped
