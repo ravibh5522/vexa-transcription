@@ -1,14 +1,16 @@
 name: vexa_dev
 services:
   # Vexa Bot - Built but not run as a service (spawned dynamically by bot-manager)
+  # This service builds the image that bot-manager uses to spawn bot containers
   vexa-bot:
     build:
       context: services/vexa-bot/core
       dockerfile: Dockerfile
     image: vexa-bot:dev
-    profiles: ["build-only"]  # Won't start, just builds the image
+    command: ["echo", "Image built successfully"]  # Just exit after building
     networks:
       - vexa_default
+    restart: "no"
 
   # Frontend UI - Static files served by Python http.server
   vexa-ui:
