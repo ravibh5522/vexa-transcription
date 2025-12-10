@@ -302,6 +302,41 @@
     <!-- Toast Notifications -->
     <div id="toastContainer" class="toast-container"></div>
 
+    <script>
+        // Auto-detect server URLs based on current hostname
+        (function() {
+            const hostname = window.location.hostname;
+            const protocol = window.location.protocol;
+            
+            // If served from Coolify (sslip.io domain or IP), use the same base URL
+            // The admin API and API gateway are on different paths via Traefik or ports
+            let baseUrl, adminUrl;
+            
+            if (hostname === 'localhost' || hostname === '127.0.0.1') {
+                // Local development
+                baseUrl = 'http://localhost:18056';
+                adminUrl = 'http://localhost:18057';
+            } else {
+                // Production - assume same host, different ports
+                // Adjust these based on your Coolify/Traefik configuration
+                baseUrl = `${protocol}//${hostname.replace(/^[^.]+/, 'api')}`;  // api.xxx.sslip.io
+                adminUrl = `${protocol}//${hostname.replace(/^[^.]+/, 'admin')}`; // admin.xxx.sslip.io
+                
+                // Fallback: If using port-based routing, uncomment below:
+                // baseUrl = `${protocol}//${hostname}:18056`;
+                // adminUrl = `${protocol}//${hostname}:18057`;
+            }
+            
+            // Set default values in the login forms
+            document.addEventListener('DOMContentLoaded', function() {
+                const userBaseUrlInput = document.getElementById('userBaseUrl');
+                const adminBaseUrlInput = document.getElementById('adminBaseUrl');
+                
+                if (userBaseUrlInput) userBaseUrlInput.value = baseUrl;
+                if (adminBaseUrlInput) adminBaseUrlInput.value = adminUrl;
+            });
+        })();
+    </script>
     <script src="app.js"></script>
 </body>
 </html>

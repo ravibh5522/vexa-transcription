@@ -1,5 +1,16 @@
 name: vexa_dev
 services:
+  # Frontend UI - Static files served by nginx
+  vexa-ui:
+    image: nginx:alpine
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+    ports:
+      - "${VEXA_UI_HOST_PORT:-18080}:80"
+    networks:
+      - vexa_default
+    restart: unless-stopped
+
   api-gateway:
     build:
       context: .
