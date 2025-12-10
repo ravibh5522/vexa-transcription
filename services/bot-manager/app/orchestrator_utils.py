@@ -38,7 +38,7 @@ from sqlalchemy import select as sa_select
 
 # Assuming these are still needed from config or env
 DOCKER_HOST = os.environ.get("DOCKER_HOST", "unix://var/run/docker.sock")
-DOCKER_NETWORK = os.environ.get("DOCKER_NETWORK", "vexa_default")
+_DOCKER_NETWORK_ENV = os.environ.get("DOCKER_NETWORK", "")  # May be empty for auto-discovery
 BOT_IMAGE_NAME = os.environ.get("BOT_IMAGE_NAME", "vexa-bot:dev")
 
 # For example, use 'cuda' for NVIDIA GPUs or 'cpu' for CPU
@@ -48,6 +48,65 @@ logger = logging.getLogger("bot_manager.orchestrator_utils")
 
 # Global session for requests_unixsocket
 unix_socket_session = None
+
+# Cached network name (auto-discovered if not set)
+_discovered_network = None
+
+def _auto_discover_network() -> str:
+    """
+    Auto-discover the Docker network from bot-manager container's network settings.
+    Falls back to 'vexa_default' if discovery fails.
+    """
+    global _discovered_network
+    if _discovered_network:
+        return _discovered_network
+    
+    # First check if explicitly set via env var
+    if _DOCKER_NETWORK_ENV:
+        _discovered_network = _DOCKER_NETWORK_ENV
+        logger.info(f"Using explicitly configured DOCKER_NETWORK: {_discovered_network}")
+        return _discovered_network
+    
+    # Try to get network from /etc/hostname (container ID)
+    try:
+        with open('/etc/hostname', 'r') as f:
+            container_id = f.read().strip()
+        
+        # Get container info via Docker API
+        socket_path_abs = "/" + DOCKER_HOST.split('//', 1)[1]
+        socket_path_encoded = socket_path_abs.replace("/", "%2F")
+        socket_url = f'http+unix://{socket_path_encoded}'
+        
+        session = requests_unixsocket.Session()
+        response = session.get(f'{socket_url}/containers/{container_id}/json')
+        
+        if response.status_code == 200:
+            container_info = response.json()
+            networks = container_info.get('NetworkSettings', {}).get('Networks', {})
+            
+            # Get the first network that looks like a vexa network
+            for net_name in networks.keys():
+                if 'vexa' in net_name.lower() or 'default' in net_name.lower():
+                    _discovered_network = net_name
+                    logger.info(f"Auto-discovered Docker network from container: {_discovered_network}")
+                    return _discovered_network
+            
+            # If no vexa network found, use the first one
+            if networks:
+                _discovered_network = list(networks.keys())[0]
+                logger.info(f"Using first available network: {_discovered_network}")
+                return _discovered_network
+    except Exception as e:
+        logger.warning(f"Network auto-discovery failed: {e}")
+    
+    # Fallback to default
+    _discovered_network = "vexa_default"
+    logger.warning(f"Using fallback network: {_discovered_network}")
+    return _discovered_network
+
+def get_docker_network() -> str:
+    """Get the Docker network to use for bot containers."""
+    return _auto_discover_network()
 
 # Define a local exception
 class DockerConnectionError(Exception):
@@ -245,14 +304,18 @@ async def start_bot_container(
     socket_path_encoded = socket_path_abs.replace("/", "%2F")
     socket_url_base = f'http+unix://{socket_path_encoded}'
 
+    # Get the Docker network (auto-discovered or from env)
+    docker_network = get_docker_network()
+    
     # Docker API payload for creating a container
+    logger.info(f"Bot container config: Image={BOT_IMAGE_NAME}, Network={docker_network}")
     create_payload = {
         "Image": BOT_IMAGE_NAME,
         "Env": environment,
         "Labels": {"vexa.user_id": str(user_id)}, # *** ADDED Label ***
         "HostConfig": {
-            "NetworkMode": DOCKER_NETWORK,
-            "AutoRemove": True,
+            "NetworkMode": docker_network,
+            "AutoRemove": False,  # Keep container for log inspection after crash
             "Mounts": []
         },
     }
@@ -264,6 +327,16 @@ async def start_bot_container(
     try:
         logger.info(f"Attempting to create bot container '{container_name}' ({BOT_IMAGE_NAME}) via socket ({socket_url_base})...")
         response = session.post(create_url, json=create_payload)
+        
+        # Check for specific error conditions
+        if response.status_code == 404:
+            error_msg = response.json().get('message', response.text)
+            if 'No such image' in error_msg or 'not found' in error_msg.lower():
+                logger.error(f"Bot image '{BOT_IMAGE_NAME}' not found! Make sure to build it with 'docker-compose build vexa-bot-image' or 'make build-bot-image'. Error: {error_msg}")
+            else:
+                logger.error(f"404 Error creating container: {error_msg}")
+            return None, None
+        
         response.raise_for_status()
         container_info = response.json()
         container_id = container_info.get('Id')
@@ -272,17 +345,25 @@ async def start_bot_container(
             logger.error(f"Failed to create container: No ID in response: {container_info}")
             return None, None
 
-        logger.info(f"Container {container_id} created. Starting...")
+        logger.info(f"Container {container_id[:12]} created. Starting...")
 
         start_url = start_url_template.format(container_id)
         response = session.post(start_url)
 
         if response.status_code != 204:
-            logger.error(f"Failed to start container {container_id}. Status: {response.status_code}, Response: {response.text}")
-            # Consider removing the created container if start fails?
+            logger.error(f"Failed to start container {container_id[:12]}. Status: {response.status_code}, Response: {response.text}")
+            # Try to get container logs for debugging
+            try:
+                logs_url = f'{socket_url_base}/containers/{container_id}/logs?stdout=true&stderr=true&tail=50'
+                logs_response = session.get(logs_url)
+                if logs_response.status_code == 200:
+                    logger.error(f"Container {container_id[:12]} logs: {logs_response.text[:1000]}")
+            except Exception as log_err:
+                logger.debug(f"Could not get container logs: {log_err}")
             return None, None
 
-        logger.info(f"Successfully started container {container_id} for meeting: {meeting_id}")
+        logger.info(f"✅ Successfully started container {container_id[:12]} (name={container_name}) for meeting: {meeting_id}")
+        logger.info(f"   To view logs: docker logs {container_name}")
         
         # *** REMOVED Session Recording Call - To be handled by caller ***
         # try:
@@ -299,7 +380,7 @@ async def start_bot_container(
 
     # Clean up created container if start failed or exception occurred before returning container_id
     # This requires careful handling to avoid race conditions if another process is managing it.
-    # For now, relying on AutoRemove=True might be sufficient if start fails cleanly.
+    # Since AutoRemove is now False, we may need to clean up manually.
     # If an exception happens between create and start success logging, container might linger.
 
     return None, None # Return None for both if error occurs

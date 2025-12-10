@@ -283,7 +283,27 @@ async def startup_event():
     # await init_db() # Removed - Admin API should handle this
     # await init_redis() # Removed redis init if not used elsewhere
     try:
-        get_socket_session()
+        session = get_socket_session()
+        
+        # Check if bot image exists
+        if session:
+            from app.orchestrator_utils import BOT_IMAGE_NAME, DOCKER_HOST, get_docker_network
+            socket_path_abs = "/" + DOCKER_HOST.split('//', 1)[1]
+            socket_path_encoded = socket_path_abs.replace("/", "%2F")
+            socket_url = f'http+unix://{socket_path_encoded}'
+            
+            # Check if the bot image exists
+            image_url = f'{socket_url}/images/{BOT_IMAGE_NAME}/json'
+            response = session.get(image_url)
+            if response.status_code == 404:
+                logger.warning(f"⚠️  Bot image '{BOT_IMAGE_NAME}' not found! Bots will fail to start.")
+                logger.warning(f"⚠️  Run 'docker-compose build vexa-bot-image' to build the image.")
+            else:
+                logger.info(f"✅ Bot image '{BOT_IMAGE_NAME}' found and ready.")
+            
+            # Log the discovered network
+            docker_network = get_docker_network()
+            logger.info(f"✅ Using Docker network: {docker_network}")
     except Exception as e:
         logger.error(f"Failed to initialize Docker client on startup: {e}", exc_info=True)
 

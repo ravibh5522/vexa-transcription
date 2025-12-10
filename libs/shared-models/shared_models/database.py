@@ -2,6 +2,7 @@ import os
 import logging
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.pool import NullPool
 from sqlalchemy import create_engine # For sync engine if needed for migrations later
 from sqlalchemy.sql import text
 
@@ -37,12 +38,11 @@ DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT
 DATABASE_URL_SYNC = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 # --- SQLAlchemy Async Engine & Session --- 
-# Use pool settings appropriate for async connections
+# Disable connection pooling - each connection is created fresh
 engine = create_async_engine(
     DATABASE_URL, 
     echo=os.environ.get("LOG_LEVEL", "INFO").upper() == "DEBUG",
-    pool_size=10, # Example pool size
-    max_overflow=20 # Example overflow
+    poolclass=NullPool,  # No connection pooling
 )
 async_session_local = sessionmaker(
     bind=engine,
