@@ -573,10 +573,14 @@ async def get_user_details(
 # App events
 @app.on_event("startup")
 async def startup_event():
-    logger.info("Admin API starting up. Skipping automatic DB initialization.")
-    # The 'migrate-or-init' Makefile target is now responsible for all DB setup.
-    # await init_db()
-    pass
+    logger.info("Admin API starting up. Initializing database tables...")
+    try:
+        await init_db()
+        logger.info("Database tables initialized successfully.")
+    except Exception as e:
+        logger.error(f"Failed to initialize database tables: {e}")
+        # Don't raise - let the service start even if DB init fails
+        # This allows health checks to work while DB issues are debugged
 
 # Include the admin router
 app.include_router(admin_router)
