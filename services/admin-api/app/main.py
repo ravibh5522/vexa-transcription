@@ -8,10 +8,10 @@ from fastapi.security import APIKeyHeader
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload, attributes
-from typing import List # Import List for response model
+from typing import List, Optional # Import List for response model
 from datetime import datetime # Import datetime
 from sqlalchemy import func
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, HttpUrl, Field
 
 # Import shared models and schemas
 from shared_models.models import User, APIToken, Base, Meeting, Transcription, MeetingSession # Import Base for init_db and Meeting
@@ -52,6 +52,10 @@ class MeetingUserStat(MeetingResponse): # Inherit from MeetingResponse to get me
 class PaginatedMeetingUserStatResponse(BaseModel):
     total: int
     items: List[MeetingUserStat]
+
+# Response for user creation - includes the generated API token
+class UserCreatedResponse(UserResponse):
+    token: Optional[str] = Field(None, description="The generated API token for the new user (only returned on creation)")
 
 # Security - Reuse logic from bot-manager/auth.py for admin token verification
 API_KEY_HEADER = APIKeyHeader(name="X-Admin-API-Key", auto_error=False) # Use a distinct header
@@ -141,17 +145,17 @@ async def set_user_webhook(
 
 # --- Admin Endpoints (Copied and adapted from bot-manager/admin.py) --- 
 @admin_router.post("/users",
-             response_model=UserResponse,
+             response_model=UserCreatedResponse,
              status_code=status.HTTP_201_CREATED,
              summary="Find or create a user by email",
              responses={
                  status.HTTP_200_OK: {
-                     "description": "User found and returned",
-                     "model": UserResponse,
+                     "description": "User found and returned (no token included for existing users)",
+                     "model": UserCreatedResponse,
                  },
                  status.HTTP_201_CREATED: {
-                     "description": "User created successfully",
-                     "model": UserResponse,
+                     "description": "User created successfully with API token",
+                     "model": UserCreatedResponse,
                  }
              })
 async def create_user(user_in: UserCreate, response: Response, db: AsyncSession = Depends(get_db)):
@@ -161,7 +165,17 @@ async def create_user(user_in: UserCreate, response: Response, db: AsyncSession 
     if existing_user:
         logger.info(f"Found existing user: {existing_user.email} (ID: {existing_user.id})")
         response.status_code = status.HTTP_200_OK
-        return UserResponse.from_orm(existing_user)
+        # For existing users, return without token (they already have one)
+        return UserCreatedResponse(
+            id=existing_user.id,
+            email=existing_user.email,
+            name=existing_user.name,
+            image_url=existing_user.image_url,
+            max_concurrent_bots=existing_user.max_concurrent_bots,
+            data=existing_user.data,
+            created_at=existing_user.created_at,
+            token=None
+        )
 
     user_data = user_in.dict()
     db_user = User(
@@ -173,16 +187,39 @@ async def create_user(user_in: UserCreate, response: Response, db: AsyncSession 
     db.add(db_user)
     await db.commit()
     await db.refresh(db_user)
-    logger.info(f"Admin created user: {db_user.email} (ID: {db_user.id})")
-    return UserResponse.from_orm(db_user)
+    
+    # Generate an API token for the new user
+    token_value = generate_secure_token()
+    db_token = APIToken(token=token_value, user_id=db_user.id)
+    db.add(db_token)
+    await db.commit()
+    
+    logger.info(f"Admin created user: {db_user.email} (ID: {db_user.id}) with API token")
+    
+    # Return user with the generated token
+    return UserCreatedResponse(
+        id=db_user.id,
+        email=db_user.email,
+        name=db_user.name,
+        image_url=db_user.image_url,
+        max_concurrent_bots=db_user.max_concurrent_bots,
+        data=db_user.data,
+        created_at=db_user.created_at,
+        token=token_value
+    )
 
 @admin_router.get("/users", 
-            response_model=List[UserResponse], # Use List import
-            summary="List all users")
+            response_model=List[UserDetailResponse], # Include tokens in list
+            summary="List all users with their API tokens")
 async def list_users(skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).offset(skip).limit(limit))
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.api_tokens))
+        .offset(skip)
+        .limit(limit)
+    )
     users = result.scalars().all()
-    return [UserResponse.from_orm(u) for u in users]
+    return [UserDetailResponse.from_orm(u) for u in users]
 
 @admin_router.get("/users/email/{user_email}",
             response_model=UserResponse, # Changed from UserDetailResponse

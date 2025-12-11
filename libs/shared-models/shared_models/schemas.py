@@ -376,9 +376,9 @@ class MeetingCreate(BaseModel):
         native_id = v.strip()
         
         if platform == Platform.GOOGLE_MEET:
-            # Google Meet format: abc-defg-hij
-            if not re.fullmatch(r"^[a-z]{3}-[a-z]{4}-[a-z]{3}$", native_id):
-                raise ValueError("Google Meet ID must be in format 'abc-defg-hij' (lowercase letters only)")
+            # Google Meet format: abc-defg-hij (case-insensitive)
+            if not re.fullmatch(r"^[a-zA-Z]{3}-[a-zA-Z]{4}-[a-zA-Z]{3}$", native_id):
+                raise ValueError("Google Meet ID must be in format 'abc-defg-hij' (3 letters, dash, 4 letters, dash, 3 letters)")
         
         elif platform == Platform.TEAMS:
             # Teams format: numeric ID only (10-15 digits)

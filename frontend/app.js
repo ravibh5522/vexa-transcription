@@ -995,7 +995,8 @@ async function loadAllUsers() {
                         <th>Email</th>
                         <th>Name</th>
                         <th>Max Bots</th>
-                        <th>Created</th>
+                        <th>API Tokens</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1005,7 +1006,21 @@ async function loadAllUsers() {
                             <td>${u.email}</td>
                             <td>${u.name || '-'}</td>
                             <td>${u.max_concurrent_bots || 'unlimited'}</td>
-                            <td>${formatDate(u.created_at)}</td>
+                            <td class="tokens-cell">
+                                ${u.api_tokens && u.api_tokens.length > 0 
+                                    ? u.api_tokens.map(t => `
+                                        <div class="token-item">
+                                            <code class="token-value" title="${t.token}">${t.token.substring(0, 8)}...${t.token.substring(t.token.length - 4)}</code>
+                                            <button class="btn-icon copy-token" onclick="copyToken('${t.token}')" title="Copy token">📋</button>
+                                            <button class="btn-icon delete-token" onclick="deleteToken(${t.id}, ${u.id})" title="Delete token">🗑️</button>
+                                        </div>
+                                    `).join('')
+                                    : '<span class="no-tokens">No tokens</span>'
+                                }
+                            </td>
+                            <td>
+                                <button class="btn btn-small btn-secondary" onclick="generateToken(${u.id})">+ Generate Token</button>
+                            </td>
                         </tr>
                     `).join('')}
                 </tbody>
@@ -1013,6 +1028,66 @@ async function loadAllUsers() {
         `;
     } catch (error) {
         showToast(`Failed to load users: ${error.message}`, 'error');
+    }
+}
+
+async function generateToken(userId) {
+    try {
+        const response = await fetch(`${state.adminUrl}/admin/users/${userId}/tokens`, {
+            method: 'POST',
+            headers: { 'X-Admin-API-Key': state.adminToken }
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to generate token');
+        }
+        
+        const token = await response.json();
+        showToast(`Token generated: ${token.token}`, 'success');
+        
+        // Copy to clipboard
+        await navigator.clipboard.writeText(token.token);
+        showToast('Token copied to clipboard!', 'success');
+        
+        // Refresh the users list
+        loadAllUsers();
+    } catch (error) {
+        showToast(`Failed to generate token: ${error.message}`, 'error');
+    }
+}
+
+async function deleteToken(tokenId, userId) {
+    if (!confirm('Are you sure you want to delete this token? This action cannot be undone.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${state.adminUrl}/admin/tokens/${tokenId}`, {
+            method: 'DELETE',
+            headers: { 'X-Admin-API-Key': state.adminToken }
+        });
+        
+        if (!response.ok && response.status !== 204) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to delete token');
+        }
+        
+        showToast('Token deleted successfully', 'success');
+        
+        // Refresh the users list
+        loadAllUsers();
+    } catch (error) {
+        showToast(`Failed to delete token: ${error.message}`, 'error');
+    }
+}
+
+async function copyToken(token) {
+    try {
+        await navigator.clipboard.writeText(token);
+        showToast('Token copied to clipboard!', 'success');
+    } catch (error) {
+        showToast('Failed to copy token', 'error');
     }
 }
 

@@ -64,6 +64,11 @@ async def update_meeting_status(
     """
     current_status = MeetingStatus(meeting.status)
     
+    # If status is already the same, treat as success (idempotent)
+    if current_status == new_status:
+        logger.debug(f"Meeting {meeting.id} already in status '{new_status.value}', ignoring duplicate status update")
+        return True
+    
     # Validate transition
     if not is_valid_status_transition(current_status, new_status):
         logger.warning(f"Invalid status transition from '{current_status.value}' to '{new_status.value}' for meeting {meeting.id}")
