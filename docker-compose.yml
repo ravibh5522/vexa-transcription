@@ -330,6 +330,12 @@ services:
       - POSTGRES_DB=vexa
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=200"
+      - "-c"
+      - "idle_in_transaction_session_timeout=60000"  # 60 seconds timeout for idle transactions
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:

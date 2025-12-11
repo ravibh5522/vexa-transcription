@@ -104,6 +104,7 @@ app.add_middleware(
 )
 
 # Custom CORS middleware as backup - adds headers even if CORSMiddleware misses
+# This also catches exceptions and ensures CORS headers are always present
 class CORSBackupMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         # Handle preflight OPTIONS requests directly
@@ -115,11 +116,20 @@ class CORSBackupMiddleware(BaseHTTPMiddleware):
             response.headers["Access-Control-Max-Age"] = "86400"
             return response
         
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception as exc:
+            # If any exception occurs, return a proper error response with CORS headers
+            import traceback
+            print(f"CORSBackupMiddleware caught exception: {exc}")
+            traceback.print_exc()
+            response = PlainTextResponse(
+                content=f"Internal Server Error: {str(exc)}",
+                status_code=500
+            )
         
-        # Ensure CORS headers are present on all responses
-        if "Access-Control-Allow-Origin" not in response.headers:
-            response.headers["Access-Control-Allow-Origin"] = "*"
+        # Ensure CORS headers are present on all responses (including error responses)
+        response.headers["Access-Control-Allow-Origin"] = "*"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD"
         response.headers["Access-Control-Allow-Headers"] = "*"
         
@@ -127,6 +137,20 @@ class CORSBackupMiddleware(BaseHTTPMiddleware):
 
 # Add backup CORS middleware (runs before the main CORS middleware)
 app.add_middleware(CORSBackupMiddleware)
+
+# Exception handler to ensure CORS headers on HTTPException responses
+from fastapi.responses import JSONResponse
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    response = JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail}
+    )
+    # Add CORS headers to error responses
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    return response
 
 # Custom OpenAPI Schema
 def custom_openapi():
@@ -183,7 +207,12 @@ async def health_check():
 async def startup_event():
     # Configure timeouts to prevent hanging connections
     timeout = httpx.Timeout(30.0, connect=10.0)  # 30s total, 10s for connect
-    limits = httpx.Limits(max_keepalive_connections=20, max_connections=100)
+    # Configure connection limits with keepalive expiry to prevent stale connections
+    limits = httpx.Limits(
+        max_keepalive_connections=20, 
+        max_connections=100,
+        keepalive_expiry=30.0  # Close idle connections after 30 seconds
+    )
     app.state.http_client = httpx.AsyncClient(timeout=timeout, limits=limits)
     # Initialize Redis for Pub/Sub used by WS
     redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")

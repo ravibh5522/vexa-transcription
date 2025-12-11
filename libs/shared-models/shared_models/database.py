@@ -2,7 +2,6 @@ import os
 import logging
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.pool import NullPool
 from sqlalchemy import create_engine # For sync engine if needed for migrations later
 from sqlalchemy.sql import text
 
@@ -38,11 +37,15 @@ DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT
 DATABASE_URL_SYNC = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 # --- SQLAlchemy Async Engine & Session --- 
-# Disable connection pooling - each connection is created fresh
+# Configure connection pool with recycling to handle stale connections
 engine = create_async_engine(
     DATABASE_URL, 
     echo=os.environ.get("LOG_LEVEL", "INFO").upper() == "DEBUG",
-    poolclass=NullPool,  # No connection pooling
+    pool_size=5,              # Modest pool size per service
+    max_overflow=10,          # Allow temporary extra connections
+    pool_timeout=30,          # Wait max 30s for a connection
+    pool_recycle=1800,        # Recycle connections after 30 minutes
+    pool_pre_ping=True,       # Verify connection health before use
 )
 async_session_local = sessionmaker(
     bind=engine,
